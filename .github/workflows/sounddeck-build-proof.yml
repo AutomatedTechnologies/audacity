@@ -16,7 +16,7 @@ on:
 jobs:
   build_macos_x64:
     name: Build macOS x86_64 (10.13 target)
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 350
     steps:
     - name: Checkout
