@@ -38,6 +38,18 @@ jobs:
         } | tee build-env-manifest.txt
     - name: Setup Dependencies
       uses: audacity/audacity-actions/dependencies@v7
+    - name: Upgrade Conan past the AppleClang-15 settings cap (build-environment fix)
+      shell: bash
+      run: |
+        python3 -m pip install --upgrade "conan>=2.10"
+        conan --version
+        echo "conan_upgrade: $(conan --version) - Conan >=2.10 default settings know AppleClang 16/17; unmodified default settings.yml auto-migrates" >> build-env-manifest.txt
+    - name: Seed patched settings into the build-dir Conan home (S1 insurance)
+      shell: bash
+      run: |
+        mkdir -p .build.x64/conan/home
+        cp ~/.conan2/settings.yml .build.x64/conan/home/settings.yml
+        echo "conan_home_seed: .build.x64/conan/home/settings.yml seeded from the patched user settings" >> build-env-manifest.txt
     - name: Extend Conan settings for AppleClang 16/17 (build-environment fix)
       shell: bash
       run: |
