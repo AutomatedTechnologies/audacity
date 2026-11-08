@@ -1,0 +1,71 @@
+# SoundDeck SD-T2 - High Sierra build proof (macOS x86_64)
+# Added by Detroit Automation Academy, 2026-11-08. This file is NOT part of
+# upstream Audacity. It builds the pinned Audacity-3.7.9 line (commit
+# 86d74c770974b25188ca2f23bcce47c1181bd08a) unmodified, passing the SoundDeck
+# S1 build configuration (SoundDeck files/04 section 3, item S1) at configure
+# time only - the source tree is untouched:
+#   audacity_has_networking=Off            (explicit)
+#   audacity_has_url_schemes_support=Off   (explicit)
+# A build-environment manifest proving the Sentry / crash-report build
+# secrets were unset is recorded into the proof artifact.
+name: SoundDeck SD-T2 Build Proof
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_macos_x64:
+    name: Build macOS x86_64 (10.13 target)
+    runs-on: macos-14
+    timeout-minutes: 350
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Build-environment manifest (S1)
+      shell: bash
+      run: |
+        {
+          echo "SoundDeck SD-T2 build-environment manifest"
+          echo "date_utc: $(date -u +%FT%TZ)"
+          echo "runner_os: ${{ runner.os }} ${{ runner.arch }}"
+          echo "macos: $(sw_vers -productVersion)"
+          echo "xcode: $(xcodebuild -version | tr '\n' ' ')"
+          echo "source_commit: ${{ github.sha }}"
+          echo "cmake_options: -Daudacity_has_networking=Off -Daudacity_has_url_schemes_support=Off"
+          for v in SENTRY_DSN_KEY SENTRY_HOST SENTRY_PROJECT CRASH_REPORT_URL; do
+            if printenv "$v" >/dev/null 2>&1; then echo "$v: SET"; else echo "$v: UNSET"; fi
+          done
+        } | tee build-env-manifest.txt
+    - name: Setup Dependencies
+      uses: audacity/audacity-actions/dependencies@v7
+    - name: Configure x86_64
+      uses: audacity/audacity-actions/configure@v7
+      with:
+        generator: Xcode
+        build_type: RelWithDebInfo
+        configuration_types: RelWithDebInfo
+        build_level: alpha
+        cmake_options: "-Daudacity_has_networking=Off -Daudacity_has_url_schemes_support=Off"
+        arch: x64
+    - name: Record effective CMake cache (S1)
+      shell: bash
+      run: |
+        cache=$(find .build.x64 -name CMakeCache.txt | head -1)
+        echo "cache_file: $cache" | tee -a build-env-manifest.txt
+        grep -E '^(audacity_has_networking|audacity_has_url_schemes_support|audacity_has_sentry_reporting|audacity_has_crashreports|audacity_has_updates_check|audacity_has_audiocom_upload|CMAKE_OSX_DEPLOYMENT_TARGET)' "$cache" | tee -a build-env-manifest.txt || true
+    - name: Build x86_64
+      uses: audacity/audacity-actions/build@v7
+    - name: Package proof artifact
+      shell: bash
+      run: |
+        app=$(find .build.x64 -name 'Audacity.app' -type d | head -1)
+        echo "app_bundle: $app" | tee -a build-env-manifest.txt
+        test -n "$app"
+        tar -czf sounddeck-t2-proof.tar.gz -C . build-env-manifest.txt -C "$(dirname "$app")" "$(basename "$app")"
+        ls -la sounddeck-t2-proof.tar.gz
+    - name: Upload proof artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sounddeck-t2-macos-x64-${{ github.run_id }}
+        path: sounddeck-t2-proof.tar.gz
+        if-no-files-found: error
