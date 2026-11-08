@@ -1,3 +1,9 @@
+# Academy fork — held by the Detroit Automation Academy as the SoundDeck base
+
+This is the Detroit Automation Academy's fork of **Audacity** (upstream: [audacity/audacity](https://github.com/audacity/audacity), GPL; fork point: upstream `master` @ `b98c8828`, 2026-11-08), held as the base for **SoundDeck**, the Academy's High Sierra audio editor. Full provenance: [PROVENANCE.md](PROVENANCE.md). The upstream README follows, unmodified.
+
+* * *
+
 # Audacity
 
 [![Coverage](https://s3.us-east-1.amazonaws.com/extensions.musescore.org/test/code_coverage/au_coverage_badge.svg)](https://github.com/audacity/audacity/actions/workflows/au4_check_unit_tests.yml)
