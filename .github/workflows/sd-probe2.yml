@@ -1,8 +1,0 @@
-name: SD Probe Mac
-on:
-  workflow_dispatch:
-jobs:
-  probe:
-    runs-on: macos-14
-    steps:
-    - run: echo probe-mac-ok && sw_vers
