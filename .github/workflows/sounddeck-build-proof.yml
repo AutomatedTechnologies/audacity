@@ -38,6 +38,24 @@ jobs:
         } | tee build-env-manifest.txt
     - name: Setup Dependencies
       uses: audacity/audacity-actions/dependencies@v7
+    - name: Extend Conan settings for AppleClang 16/17 (build-environment fix)
+      shell: bash
+      run: |
+        conan profile detect >/dev/null 2>&1 || true
+        python3 - <<'PYEOF'
+        import re, pathlib
+        p = pathlib.Path.home() / ".conan2" / "settings.yml"
+        s = p.read_text()
+        m = re.search(r'(apple-clang:\s*\n\s*version:\s*\[)([^\]]*)(\])', s)
+        assert m, "apple-clang version list not found in conan settings.yml"
+        vals = m.group(2)
+        for v in ('"16"', '"16.0"', '"17"', '"17.0"'):
+            if v not in vals:
+                vals += ", " + v
+        p.write_text(s[:m.start()] + m.group(1) + vals + m.group(3) + s[m.end():])
+        print("conan apple-clang versions now:", vals)
+        PYEOF
+        echo "conan_settings_patch: apple-clang extended +16/16.0/17/17.0 (Conan 2.4.0 defaults stop at 15.0; macos-15 runner AppleClang is 17; deps therefore build from source under --build=missing)" >> build-env-manifest.txt
     - name: Configure x86_64
       uses: audacity/audacity-actions/configure@v7
       with:
