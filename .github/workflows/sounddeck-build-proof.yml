@@ -36,14 +36,28 @@ jobs:
             if printenv "$v" >/dev/null 2>&1; then echo "$v: SET"; else echo "$v: UNSET"; fi
           done
         } | tee build-env-manifest.txt
-    - name: Setup Dependencies
-      uses: audacity/audacity-actions/dependencies@v7
-    - name: Upgrade Conan past the AppleClang-15 settings cap (build-environment fix)
+    - name: Setup Dependencies (self-managed)
+      # Replaces audacity/audacity-actions/dependencies@v7: that composite's
+      # jwlawson/actions-setup-cmake step downloads CMake from GitHub
+      # releases, which failed with HTTP 504 in 3 of 5 runs on 2026-11-08.
+      # This setup uses the runner image's own CMake (>= 3.24), the
+      # toolcache Python 3.11, and PyPI for Conan - no GitHub-release
+      # downloads. Build semantics are unchanged (same configure/build
+      # actions and options downstream).
       shell: bash
       run: |
-        python3 -m pip install --upgrade "conan>=2.10"
+        if ! command -v cmake >/dev/null 2>&1; then brew install cmake; fi
+        cmake --version | head -1
+    - name: Setup Python 3.11
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.11'
+    - name: Install Conan (self-managed)
+      shell: bash
+      run: |
+        python3 -m pip install "conan>=2.10,<3"
         conan --version
-        echo "conan_upgrade: $(conan --version) - Conan >=2.10 default settings know AppleClang 16/17; unmodified default settings.yml auto-migrates" >> build-env-manifest.txt
+        { echo "toolchain_cmake: $(cmake --version | head -1)"; echo "toolchain_conan: $(conan --version)"; } >> build-env-manifest.txt
     - name: Seed patched settings into the build-dir Conan home (S1 insurance)
       shell: bash
       run: |
