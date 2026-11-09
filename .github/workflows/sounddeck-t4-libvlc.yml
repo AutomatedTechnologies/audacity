@@ -94,12 +94,13 @@ jobs:
           | tee -a sdt4-build-manifest.txt
         grep -q '^MINIMAL_OSX_VERSION="10.13"$' vlc-3.0.24/extras/package/macosx/build.sh
 
-    - name: Build VLC 3.0.24 (upstream build.sh, prebuilt contribs)
+    - name: Build VLC 3.0.24 (upstream build.sh, contribs from source)
       shell: bash
       run: |
+        echo "vlc_contrib_route: from source (build.sh -c). The prebuilt route is unavailable for this tree: make prebuilt requests vlc-contrib-x86_64-apple-darwin24-latest.tar.zst from download.videolan.org/pub/videolan/contrib/x86_64-apple-darwin24/ and that triplet directory does not exist (HTTP 404; SD-T4 attempt 2, job log). The newest published x86_64 prebuilts under that path are darwin17/darwin18 .tar.bz2 tarballs from 2019, which predate this contrib tree's .tar.zst naming and package set." >> sdt4-build-manifest.txt
         mkdir -p vlc-build
         cd vlc-build
-        sh ../vlc-3.0.24/extras/package/macosx/build.sh 2>&1 | tee ../vlc-build.log
+        sh ../vlc-3.0.24/extras/package/macosx/build.sh -c 2>&1 | tee ../vlc-build.log
         test -d VLC.app/Contents/MacOS/lib
         test -f VLC.app/Contents/MacOS/lib/libvlc.dylib
 
