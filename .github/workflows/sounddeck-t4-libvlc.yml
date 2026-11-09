@@ -11,11 +11,21 @@
 #
 # Method notes:
 # - VLC is built with upstream's own extras/package/macosx/build.sh
-#   (prebuilt contribs), with ONE build-environment pin: the script's
-#   MINIMAL_OSX_VERSION is rewritten 10.7 -> 10.13 so the produced
-#   binaries carry the SoundDeck 10.13 floor. No VLC source file is
-#   modified; the rewrite and its grep proof are recorded in the build
-#   manifest.
+#   (contribs from source, -c), with ONE build-environment pin: the
+#   script's MINIMAL_OSX_VERSION is rewritten 10.7 -> 10.13 so the
+#   produced binaries carry the SoundDeck 10.13 floor. No VLC source
+#   file is modified; the rewrite and its grep proof are recorded in
+#   the build manifest.
+# - ONE configure trim, passed via VLC_CONFIGURE_ARGS: --disable-sparkle.
+#   Sparkle is the VLC.app auto-update framework. The from-source
+#   contrib build does not build it (upstream enables it only for
+#   release packaging), while VLC's configure requires it by default
+#   on macOS and hard-fails without it (SD-T4 run 42710708771:
+#   "configure: error: Sparkle framework is required and was not found
+#   in .../contrib/x86_64-apple-darwin24"). SoundDeck uses libVLC only
+#   and ships no updater (zero-telemetry design), so Sparkle is off.
+#   This flag touches no libVLC core, sout/transcode, mux, codec, or
+#   audio-output capability.
 # - Every verdict is read from the built binaries or their runtime
 #   behavior (libVLC state, output WAV parameters, otool load commands),
 #   never from configure/cache text - the SD-T3 lesson.
@@ -35,6 +45,11 @@ jobs:
     name: libVLC 3.0.24 helper proof (macos-15, x86_64)
     runs-on: macos-15
     timeout-minutes: 300
+    env:
+      # Documented trim (see header): disables only the Sparkle
+      # auto-update framework, which the from-source contrib build
+      # does not provide and VLC configure otherwise hard-requires.
+      VLC_CONFIGURE_ARGS: "--disable-sparkle"
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -98,6 +113,7 @@ jobs:
       shell: bash
       run: |
         echo "vlc_contrib_route: from source (build.sh -c). The prebuilt route is unavailable for this tree: make prebuilt requests vlc-contrib-x86_64-apple-darwin24-latest.tar.zst from download.videolan.org/pub/videolan/contrib/x86_64-apple-darwin24/ and that triplet directory does not exist (HTTP 404; SD-T4 attempt 2, job log). The newest published x86_64 prebuilts under that path are darwin17/darwin18 .tar.bz2 tarballs from 2019, which predate this contrib tree's .tar.zst naming and package set." >> sdt4-build-manifest.txt
+        echo "vlc_configure_trim: VLC_CONFIGURE_ARGS=--disable-sparkle (Sparkle auto-update framework only; the from-source contrib build does not build Sparkle and VLC configure hard-requires it by default on macOS - SD-T4 run 42710708771 configure error. No libVLC core/sout/codec capability trimmed.)" >> sdt4-build-manifest.txt
         mkdir -p vlc-build
         cd vlc-build
         sh ../vlc-3.0.24/extras/package/macosx/build.sh -c 2>&1 | tee ../vlc-build.log
