@@ -62,8 +62,13 @@ files themselves — never from build configuration or cache text
    (build-environment pin only; no VLC source file is modified and the
    change is recorded in the manifest).
 4. Builds VLC with upstream's own script
-   (`sh ../vlc-3.0.24/extras/package/macosx/build.sh` from `vlc-build/`),
-   which uses the prebuilt contribs and finishes with `make VLC.app`.
+   (`sh ../vlc-3.0.24/extras/package/macosx/build.sh -c` from `vlc-build/`),
+   finishing with `make VLC.app`. The `-c` flag builds the contribs
+   from source: the prebuilt-contribs route is unavailable for this
+   tree (the darwin24 triplet directory does not exist on
+   download.videolan.org — HTTP 404, verified in the SD-T4 attempt-2
+   job log — and the newest published x86_64 prebuilts are 2019
+   darwin17/darwin18 tarballs).
 5. Compiles the helper with
    `clang -arch x86_64 -mmacosx-version-min=10.13` against the built
    `VLC.app/Contents/MacOS/lib/libvlc.dylib` and the pinned tree's
