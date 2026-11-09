@@ -1,0 +1,269 @@
+# SoundDeck SD-T4 - libVLC helper prototype proof (macOS x86_64)
+# Added by Detroit Automation Academy, 2026-11-09. This file is NOT part
+# of upstream Audacity.
+#
+# Purpose: build-level proof that libVLC 3.0.24 (videolan/vlc tag 3.0.24,
+# commit 6de05adcbaf2e8b85fe86aad4169393098628119 - SoundDeck files/03 pin)
+# loads, plays, transcodes and audio-extracts when driven by the Academy
+# helper prototype (sounddeck/vlc-helper/sounddeck-vlc-helper.c) inside
+# this pinned Audacity-3.7.9-line tree (base commit
+# 86d74c770974b25188ca2f23bcce47c1181bd08a).
+#
+# Method notes:
+# - VLC is built with upstream's own extras/package/macosx/build.sh
+#   (prebuilt contribs), with ONE build-environment pin: the script's
+#   MINIMAL_OSX_VERSION is rewritten 10.7 -> 10.13 so the produced
+#   binaries carry the SoundDeck 10.13 floor. No VLC source file is
+#   modified; the rewrite and its grep proof are recorded in the build
+#   manifest.
+# - Every verdict is read from the built binaries or their runtime
+#   behavior (libVLC state, output WAV parameters, otool load commands),
+#   never from configure/cache text - the SD-T3 lesson.
+# - The x86_64 helper and libVLC execute on the arm64 runner via
+#   Rosetta 2, installed in an early step when needed.
+# - ffmpeg, when installed for the A/V fixture, is fixture tooling
+#   ONLY. It is not part of the produced artifact.
+name: SoundDeck SD-T4 libVLC Proof
+
+on:
+  push:
+    branches:
+      - sounddeck-t4-libvlc
+
+jobs:
+  build_macos_x64:
+    name: libVLC 3.0.24 helper proof (macos-15, x86_64)
+    runs-on: macos-15
+    timeout-minutes: 300
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 5
+
+    - name: Build manifest
+      shell: bash
+      run: |
+        {
+          echo "SoundDeck SD-T4 build manifest"
+          echo "date_utc: $(date -u +%FT%TZ)"
+          echo "runner_os: ${{ runner.os }} ${{ runner.arch }}"
+          echo "uname_m: $(uname -m)"
+          echo "macos: $(sw_vers -productVersion)"
+          echo "xcode_default: $(xcodebuild -version | tr '\n' ' ')"
+          echo "xcode_apps: $(ls /Applications | grep -i '^Xcode' | tr '\n' ' ')"
+          echo "branch: ${{ github.ref_name }}"
+          echo "head_commit: ${{ github.sha }}"
+          echo "git_log_oneline_5:"
+          git log --oneline -5 || true
+          echo "audacity_base_pin: 86d74c770974b25188ca2f23bcce47c1181bd08a (tag Audacity-3.7.9)"
+          echo "vlc_pin: tag 3.0.24 commit 6de05adcbaf2e8b85fe86aad4169393098628119"
+          echo "vlc_configure_args: ${VLC_CONFIGURE_ARGS:-(none)}"
+          echo "ffmpeg_role: fixture tooling only (not part of the artifact)"
+        } | tee sdt4-build-manifest.txt
+
+    - name: Install Rosetta 2 (for x86_64 execution on arm64 runner)
+      shell: bash
+      run: |
+        if [ "$(uname -m)" = "arm64" ]; then
+          if /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
+            echo "rosetta: already installed"
+          else
+            softwareupdate --install-rosetta --agree-to-license || true
+            /usr/bin/arch -x86_64 /usr/bin/true
+            echo "rosetta: installed by this run"
+          fi
+        else
+          echo "rosetta: not needed (native x86_64 runner)"
+        fi
+
+    - name: Checkout videolan/vlc at 3.0.24
+      uses: actions/checkout@v4
+      with:
+        repository: videolan/vlc
+        ref: 3.0.24
+        path: vlc-3.0.24
+
+    - name: Pin VLC macOS build floor to 10.13 (build-environment only)
+      shell: bash
+      run: |
+        sed -i '' 's/^MINIMAL_OSX_VERSION="10.7"$/MINIMAL_OSX_VERSION="10.13"/' \
+          vlc-3.0.24/extras/package/macosx/build.sh
+        echo "vlc_build_sh_minimal_osx_version_after_pin:" >> sdt4-build-manifest.txt
+        grep -n '^MINIMAL_OSX_VERSION=' vlc-3.0.24/extras/package/macosx/build.sh \
+          | tee -a sdt4-build-manifest.txt
+        grep -q '^MINIMAL_OSX_VERSION="10.13"$' vlc-3.0.24/extras/package/macosx/build.sh
+
+    - name: Build VLC 3.0.24 (upstream build.sh, prebuilt contribs)
+      shell: bash
+      run: |
+        mkdir -p vlc-build
+        cd vlc-build
+        sh ../vlc-3.0.24/extras/package/macosx/build.sh 2>&1 | tee ../vlc-build.log
+        test -d VLC.app/Contents/MacOS/lib
+        test -f VLC.app/Contents/MacOS/lib/libvlc.dylib
+
+    - name: Compile sounddeck-vlc-helper against built libVLC
+      shell: bash
+      run: |
+        LIBDIR="$PWD/vlc-build/VLC.app/Contents/MacOS/lib"
+        test -f "$LIBDIR/libvlc.dylib"
+        clang -arch x86_64 -mmacosx-version-min=10.13 -O2 -Wall \
+          -I vlc-3.0.24/include \
+          -o sounddeck-vlc-helper \
+          sounddeck/vlc-helper/sounddeck-vlc-helper.c \
+          -L "$LIBDIR" -lvlc -Wl,-rpath,"$LIBDIR"
+        ls -la sounddeck-vlc-helper
+
+    - name: Generate fixtures
+      shell: bash
+      run: |
+        python3 - <<'PYEOF'
+        import math, struct, wave
+        rate = 44100
+        frames = rate * 2
+        w = wave.open("tone.wav", "wb")
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        buf = bytearray()
+        for i in range(frames):
+            v = int(12000 * math.sin(2.0 * math.pi * 440.0 * i / rate))
+            buf += struct.pack("<h", v)
+        w.writeframes(bytes(buf))
+        w.close()
+        print("tone.wav written:", frames, "frames mono 44100 Hz s16")
+        PYEOF
+        if ! command -v ffmpeg >/dev/null 2>&1; then
+          brew install ffmpeg
+        fi
+        ffmpeg -hide_banner -loglevel error -y \
+          -f lavfi -i testsrc=duration=2:size=320x240:rate=15 \
+          -f lavfi -i sine=frequency=440:duration=2 \
+          -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest clip.mp4
+        ls -la tone.wav clip.mp4
+
+    - name: Proof 1 - libVLC version
+      shell: bash
+      run: |
+        export VLC_PLUGIN_PATH="$PWD/vlc-build/VLC.app/Contents/MacOS/plugins"
+        ./sounddeck-vlc-helper --version | tee proof-version.log
+        grep -q "3.0.24" proof-version.log
+
+    - name: Proof 2 - playback to Ended
+      shell: bash
+      run: |
+        export VLC_PLUGIN_PATH="$PWD/vlc-build/VLC.app/Contents/MacOS/plugins"
+        ./sounddeck-vlc-helper --probe-play "$PWD/tone.wav" | tee proof-play.log
+        grep -q "^RESULT play ENDED$" proof-play.log
+
+    - name: Proof 3 - transcode to WAV
+      shell: bash
+      run: |
+        export VLC_PLUGIN_PATH="$PWD/vlc-build/VLC.app/Contents/MacOS/plugins"
+        ./sounddeck-vlc-helper --probe-transcode "$PWD/tone.wav" "$PWD/conv.wav" \
+          | tee proof-transcode.log
+        grep -q "^RESULT transcode ENDED$" proof-transcode.log
+        python3 - <<'PYEOF'
+        import wave
+        w = wave.open("conv.wav", "rb")
+        p = w.getparams()
+        dur = w.getnframes() / float(w.getframerate())
+        print("conv.wav params:", p)
+        print("conv.wav duration_s:", dur)
+        assert w.getframerate() == 44100, "sample rate"
+        assert w.getnchannels() == 2, "channels"
+        assert w.getsampwidth() == 2, "sample width"
+        assert 1.8 <= dur <= 2.2, "duration out of tolerance"
+        print("conv.wav VERIFIED")
+        PYEOF
+
+    - name: Proof 4 - extract audio from A/V file
+      shell: bash
+      run: |
+        export VLC_PLUGIN_PATH="$PWD/vlc-build/VLC.app/Contents/MacOS/plugins"
+        ./sounddeck-vlc-helper --probe-extract "$PWD/clip.mp4" "$PWD/ext.wav" \
+          | tee proof-extract.log
+        grep -q "^RESULT extract ENDED$" proof-extract.log
+        python3 - <<'PYEOF'
+        import wave
+        w = wave.open("ext.wav", "rb")
+        p = w.getparams()
+        dur = w.getnframes() / float(w.getframerate())
+        print("ext.wav params:", p)
+        print("ext.wav duration_s:", dur)
+        assert w.getframerate() == 44100, "sample rate"
+        assert w.getnchannels() == 2, "channels"
+        assert w.getsampwidth() == 2, "sample width"
+        assert 1.5 <= dur <= 2.5, "duration out of tolerance"
+        print("ext.wav VERIFIED")
+        PYEOF
+
+    - name: Serve-mode smoke test
+      shell: bash
+      run: |
+        export VLC_PLUGIN_PATH="$PWD/vlc-build/VLC.app/Contents/MacOS/plugins"
+        printf 'LOAD %s\nPLAY\nTIME\nPAUSE\nTIME\nSTOP\nQUIT\n' "$PWD/tone.wav" \
+          | ./sounddeck-vlc-helper --serve | tee proof-serve.log
+        grep -q "^OK READY" proof-serve.log
+        grep -q "^OK LOADED" proof-serve.log
+        grep -q "^OK TIME" proof-serve.log
+        grep -q "^OK BYE" proof-serve.log
+
+    - name: Binary evidence + Gate 0 Condition 6 inventory source
+      shell: bash
+      run: |
+        LIBDIR="$PWD/vlc-build/VLC.app/Contents/MacOS/lib"
+        PLUGDIR="$PWD/vlc-build/VLC.app/Contents/MacOS/plugins"
+        APPMAC="$PWD/vlc-build/VLC.app/Contents/MacOS"
+        {
+          echo "=== file ==="
+          file sounddeck-vlc-helper "$LIBDIR/libvlc.dylib" || true
+          echo "=== lipo -info ==="
+          lipo -info sounddeck-vlc-helper || true
+          lipo -info "$LIBDIR/libvlc.dylib" || true
+          echo "=== otool -L helper ==="
+          otool -L sounddeck-vlc-helper || true
+          echo "=== otool -L libvlc.dylib (first 30 lines) ==="
+          otool -L "$LIBDIR/libvlc.dylib" 2>/dev/null | head -30 || true
+          echo "=== floor: LC_VERSION_MIN_MACOSX / LC_BUILD_VERSION in libvlc.dylib ==="
+          otool -l "$LIBDIR/libvlc.dylib" 2>/dev/null \
+            | grep -A3 -E 'LC_VERSION_MIN_MACOSX|LC_BUILD_VERSION' || true
+          echo "=== floor: LC_VERSION_MIN_MACOSX / LC_BUILD_VERSION in helper ==="
+          otool -l sounddeck-vlc-helper \
+            | grep -A3 -E 'LC_VERSION_MIN_MACOSX|LC_BUILD_VERSION' || true
+          echo "=== libvlc version strings ==="
+          strings -a "$LIBDIR/libvlc.dylib" | grep -E '3\.0\.24' | head -5 || true
+          echo "=== inventory: lib/ and plugins/ (path size) ==="
+          ( cd "$APPMAC" && find lib plugins \( -type f -o -type l \) -print \
+              | LC_ALL=C sort \
+              | while IFS= read -r f; do
+                  printf '%s %s\n' "$f" "$(stat -f '%z' "$f")"
+                done ) || true
+          echo "=== inventory count ==="
+          ( cd "$APPMAC" && find lib plugins \( -type f -o -type l \) -print \
+              | wc -l ) || true
+        } | tee sdt4-binary-evidence.txt
+
+    - name: Hash outputs
+      shell: bash
+      run: |
+        shasum -a 256 tone.wav clip.mp4 conv.wav ext.wav sounddeck-vlc-helper \
+          | tee sdt4-output-hashes.txt
+
+    - name: Upload proof artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sounddeck-t4-libvlc-${{ github.run_id }}
+        path: |
+          sounddeck-vlc-helper
+          sdt4-build-manifest.txt
+          vlc-build.log
+          proof-version.log
+          proof-play.log
+          proof-transcode.log
+          proof-extract.log
+          proof-serve.log
+          sdt4-binary-evidence.txt
+          sdt4-output-hashes.txt
+        if-no-files-found: error
