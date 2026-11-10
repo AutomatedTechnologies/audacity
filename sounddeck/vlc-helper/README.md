@@ -77,6 +77,15 @@ files themselves — never from build configuration or cache text
    libVLC only and ships no updater, so Sparkle stays off; the flag
    touches no libVLC core, stream-output/transcode, mux, codec, or
    audio-output capability.
+
+   Run note, 2026-11-10: run 42722312159 attempt 1 (the
+   `--disable-sparkle` fix) was cancelled externally ~35 minutes into
+   the VLC build, and its re-run then wedged pre-queue (cancel API:
+   409, "has not yet queued"). A comment-only re-trigger commit
+   (`b09afdc`) then produced no workflow run of any kind for ~4
+   hours despite Actions being enabled — a GitHub-side run-creation
+   wedge, not a build failure. This note is a second re-trigger;
+   build content is unchanged.
 5. Compiles the helper with
    `clang -arch x86_64 -mmacosx-version-min=10.13` against the built
    `VLC.app/Contents/MacOS/lib/libvlc.dylib` and the pinned tree's
