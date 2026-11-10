@@ -38,6 +38,11 @@
 #   taken: branch deleted and recreated at a62e87a (wedged run record
 #   persists, still queued). This commit is the post-recreate trigger;
 #   build content is unchanged.
+# - Run note 2026-11-10 (later still): branch recreate did not clear
+#   the stall, and a repo Actions disable/enable toggle (restored ON,
+#   allowed_actions=all) left the phantom queued re-run untouched
+#   (updated_at frozen at 00:15:46Z). This commit tests whether run
+#   creation works after the toggle. Build content unchanged.
 # - Every verdict is read from the built binaries or their runtime
 #   behavior (libVLC state, output WAV parameters, otool load commands),
 #   never from configure/cache text - the SD-T3 lesson.
