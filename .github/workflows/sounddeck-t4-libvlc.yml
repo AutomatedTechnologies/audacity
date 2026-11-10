@@ -43,6 +43,13 @@
 #   allowed_actions=all) left the phantom queued re-run untouched
 #   (updated_at frozen at 00:15:46Z). This commit tests whether run
 #   creation works after the toggle. Build content unchanged.
+# - Run note 2026-11-10 16:10 EST: the phantom queued re-run
+#   42722312159 was cancelled through the Actions API (cancel
+#   returned 202; run now completed/cancelled, updated_at
+#   2026-11-10T21:08:38Z) after the owner's Priority-0 directive
+#   of 2026-11-10 16:05 EST. The repo run-creation stall cleared
+#   with it. This commit re-triggers a fresh run on branch head
+#   d8a83b7; build content is unchanged.
 # - Every verdict is read from the built binaries or their runtime
 #   behavior (libVLC state, output WAV parameters, otool load commands),
 #   never from configure/cache text - the SD-T3 lesson.
