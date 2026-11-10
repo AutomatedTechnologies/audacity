@@ -63,6 +63,7 @@ on:
   push:
     branches:
       - sounddeck-t4-libvlc
+  workflow_dispatch:
 
 jobs:
   build_macos_x64:
