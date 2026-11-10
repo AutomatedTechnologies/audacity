@@ -26,6 +26,11 @@
 #   and ships no updater (zero-telemetry design), so Sparkle is off.
 #   This flag touches no libVLC core, sout/transcode, mux, codec, or
 #   audio-output capability.
+# - Run note 2026-11-10: run 42722312159 attempt 1 (this fix) was
+#   cancelled externally ~35 min into the VLC build; its re-run then
+#   sat pre-queue for ~3 h with no job created (cancel API: 409
+#   "Cannot cancel a workflow re-run that has not yet queued"). This
+#   commit re-triggers a fresh run of identical build content.
 # - Every verdict is read from the built binaries or their runtime
 #   behavior (libVLC state, output WAV parameters, otool load commands),
 #   never from configure/cache text - the SD-T3 lesson.
